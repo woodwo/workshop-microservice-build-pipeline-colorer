@@ -1,0 +1,37 @@
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: colorer-{{version}}
+  labels:
+    app: colorer
+    version: {{version}}
+spec:
+  replicas: 1
+  revisionHistoryLimit: 0
+  selector:
+    matchLabels:
+      app: colorer
+      version: {{version}}
+  template:
+    metadata:
+      labels:
+        app: colorer
+        version: {{version}}
+    spec:
+      restartPolicy: Always
+      terminationGracePeriodSeconds: 0
+      imagePullSecrets:
+      - name: registry-colorer
+      containers:
+      - name: main
+        image: {{image}}
+        imagePullPolicy: Always
+        resources:
+          limits:
+            memory: 256Mi
+          requests:
+            cpu: 10m
+            memory: 256Mi
+        ports:
+        - name: grpc
+          containerPort: 10000
