@@ -12,8 +12,9 @@ import (
 	"log"
 	"net"
 
+	mwgrpc "github.com/grpc-ecosystem/go-grpc-middleware"
+	otgrpc "github.com/grpc-ecosystem/go-grpc-middleware/tracing/opentracing"
 	"google.golang.org/grpc"
-
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/testdata"
 
@@ -28,12 +29,26 @@ var (
 )
 
 func main() {
+	// parse flags
 	flag.Parse()
+
+	// prepare requested port listener
 	lis, err := net.Listen("tcp", fmt.Sprintf("localhost:%d", *port))
 	if err != nil {
 		log.Fatalf("failed to listen: %v", err)
 	}
-	var opts []grpc.ServerOption
+
+	// prepare server options including interceptors
+	opts := []grpc.ServerOption{
+		grpc.StreamInterceptor(mwgrpc.ChainStreamServer(
+			otgrpc.StreamServerInterceptor(),
+		)),
+		grpc.UnaryInterceptor(mwgrpc.ChainUnaryServer(
+			otgrpc.UnaryServerInterceptor(),
+		)),
+	}
+
+	// ... including TLS options
 	if *tls {
 		if *certFile == "" {
 			*certFile = testdata.Path("server1.pem")
@@ -45,9 +60,15 @@ func main() {
 		if err != nil {
 			log.Fatalf("Failed to generate credentials %v", err)
 		}
-		opts = []grpc.ServerOption{grpc.Creds(creds)}
+		opts = append(opts, grpc.Creds(creds))
 	}
+
+	// create gRPC server
 	grpcServer := grpc.NewServer(opts...)
+
+	// register gRPC procedures handler
 	pb.RegisterColorerServer(grpcServer, pb.NewServer())
+
+	// start server
 	grpcServer.Serve(lis)
 }
